@@ -1,0 +1,1279 @@
+{
+ "key: \"getFighting68\"": "see below",
+ "key: \"getAllKey\"": "see below",
+ "basic": [
+  {
+   "name": "A",
+   "value": 4
+  },
+  {
+   "name": "B",
+   "value": 5
+  },
+  {
+   "name": "C",
+   "value": 6
+  },
+  {
+   "name": "D",
+   "value": 7
+  },
+  {
+   "name": "E",
+   "value": 8
+  },
+  {
+   "name": "F",
+   "value": 9
+  },
+  {
+   "name": "G",
+   "value": 10
+  },
+  {
+   "name": "H",
+   "value": 11
+  },
+  {
+   "name": "I",
+   "value": 12
+  },
+  {
+   "name": "J",
+   "value": 13
+  },
+  {
+   "name": "K",
+   "value": 14
+  },
+  {
+   "name": "L",
+   "value": 15
+  },
+  {
+   "name": "M",
+   "value": 16
+  },
+  {
+   "name": "N",
+   "value": 17
+  },
+  {
+   "name": "O",
+   "value": 18
+  },
+  {
+   "name": "P",
+   "value": 19
+  },
+  {
+   "name": "Q",
+   "value": 20
+  },
+  {
+   "name": "R",
+   "value": 21
+  },
+  {
+   "name": "S",
+   "value": 22
+  },
+  {
+   "name": "T",
+   "value": 23
+  },
+  {
+   "name": "U",
+   "value": 24
+  },
+  {
+   "name": "V",
+   "value": 25
+  },
+  {
+   "name": "W",
+   "value": 26
+  },
+  {
+   "name": "X",
+   "value": 27
+  },
+  {
+   "name": "Y",
+   "value": 28
+  },
+  {
+   "name": "Z",
+   "value": 29
+  },
+  {
+   "name": "1",
+   "value": 30
+  },
+  {
+   "name": "2",
+   "value": 31
+  },
+  {
+   "name": "3",
+   "value": 32
+  },
+  {
+   "name": "4",
+   "value": 33
+  },
+  {
+   "name": "5",
+   "value": 34
+  },
+  {
+   "name": "6",
+   "value": 35
+  },
+  {
+   "name": "7",
+   "value": 36
+  },
+  {
+   "name": "8",
+   "value": 37
+  },
+  {
+   "name": "9",
+   "value": 38
+  },
+  {
+   "name": "0",
+   "value": 39
+  },
+  {
+   "name": "-",
+   "value": 45
+  },
+  {
+   "name": "=",
+   "value": 46
+  },
+  {
+   "name": "[",
+   "value": 47
+  },
+  {
+   "name": "]",
+   "value": 48
+  },
+  {
+   "name": "\\",
+   "value": 49
+  },
+  {
+   "name": ";",
+   "value": 51
+  },
+  {
+   "name": "\"",
+   "value": 52
+  },
+  {
+   "name": " ~",
+   "value": 53
+  },
+  {
+   "name": ",<",
+   "value": 54
+  },
+  {
+   "name": ".>",
+   "value": 55
+  },
+  {
+   "name": "/?",
+   "value": 56
+  }
+ ],
+ "extend": [
+  {
+   "name": "Esc",
+   "key": "",
+   "value": 41
+  },
+  {
+   "name": "Tab",
+   "key": "",
+   "value": 43
+  },
+  {
+   "name": "Caps",
+   "key": "",
+   "value": 57
+  },
+  {
+   "name": "Back space",
+   "key": "",
+   "value": 42
+  },
+  {
+   "name": "Enter",
+   "key": "",
+   "value": 40
+  },
+  {
+   "name": "Space Bar",
+   "key": "",
+   "value": 44
+  },
+  {
+   "name": "L-Ctrl",
+   "key": 224,
+   "value": 1,
+   "special": 1
+  },
+  {
+   "name": "R-Ctrl",
+   "key": 228,
+   "value": 16,
+   "special": 1
+  },
+  {
+   "name": "L-Shift",
+   "key": 225,
+   "value": 2,
+   "special": 1
+  },
+  {
+   "name": "R-Shift",
+   "key": 229,
+   "value": 32,
+   "special": 1
+  },
+  {
+   "name": "L-Alt",
+   "key": 226,
+   "value": 4,
+   "special": 1
+  },
+  {
+   "name": "R-Alt",
+   "key": 230,
+   "value": 64,
+   "special": 1
+  },
+  {
+   "name": "L-Win",
+   "key": 227,
+   "value": 8,
+   "special": 1
+  },
+  {
+   "name": "Menu",
+   "key": "",
+   "value": 101
+  },
+  {
+   "name": "↑",
+   "key": "",
+   "value": 82
+  },
+  {
+   "name": "↓",
+   "key": "",
+   "value": 81
+  },
+  {
+   "name": "→",
+   "key": "",
+   "value": 79
+  },
+  {
+   "name": "←",
+   "key": "",
+   "value": 80
+  },
+  {
+   "name": "Home",
+   "key": "",
+   "value": 74
+  },
+  {
+   "name": "End",
+   "key": "",
+   "value": 77
+  },
+  {
+   "name": "Ins",
+   "key": "",
+   "value": 73
+  },
+  {
+   "name": "Del",
+   "key": "",
+   "value": 76
+  },
+  {
+   "name": "PgUp",
+   "key": "",
+   "value": 75
+  },
+  {
+   "name": "PgDn",
+   "key": "",
+   "value": 78
+  },
+  {
+   "name": "Print",
+   "key": "",
+   "value": 70
+  },
+  {
+   "name": "Scroll",
+   "key": "",
+   "value": 71
+  },
+  {
+   "name": "Pause",
+   "key": "",
+   "value": 72
+  },
+  {
+   "name": "F1",
+   "key": "",
+   "value": 58
+  },
+  {
+   "name": "F2",
+   "key": "",
+   "value": 59
+  },
+  {
+   "name": "F3",
+   "key": "",
+   "value": 60
+  },
+  {
+   "name": "F4",
+   "key": "",
+   "value": 61
+  },
+  {
+   "name": "F5",
+   "key": "",
+   "value": 62
+  },
+  {
+   "name": "F6",
+   "key": "",
+   "value": 63
+  },
+  {
+   "name": "F7",
+   "key": "",
+   "value": 64
+  },
+  {
+   "name": "F8",
+   "key": "",
+   "value": 65
+  },
+  {
+   "name": "F9",
+   "key": "",
+   "value": 66
+  },
+  {
+   "name": "F10",
+   "key": "",
+   "value": 67
+  },
+  {
+   "name": "F11",
+   "key": "",
+   "value": 68
+  },
+  {
+   "name": "F12",
+   "key": "",
+   "value": 69
+  },
+  {
+   "name": "Num Lock",
+   "key": "",
+   "value": 83
+  },
+  {
+   "name": "Num 1",
+   "key": "",
+   "value": 89
+  },
+  {
+   "name": "Num 2",
+   "key": "",
+   "value": 90
+  },
+  {
+   "name": "Num 3",
+   "key": "",
+   "value": 91
+  },
+  {
+   "name": "Num 4",
+   "key": "",
+   "value": 92
+  },
+  {
+   "name": "Num 5",
+   "key": "",
+   "value": 93
+  },
+  {
+   "name": "Num 6",
+   "key": "",
+   "value": 94
+  },
+  {
+   "name": "Num 7",
+   "key": "",
+   "value": 95
+  },
+  {
+   "name": "Num 8",
+   "key": "",
+   "value": 96
+  },
+  {
+   "name": "Num 9",
+   "key": "",
+   "value": 97
+  },
+  {
+   "name": "Num 0",
+   "key": "",
+   "value": 98
+  },
+  {
+   "name": "Num /",
+   "key": "",
+   "value": 84
+  },
+  {
+   "name": "Num .",
+   "key": "",
+   "value": 99
+  },
+  {
+   "name": "Num *",
+   "key": "",
+   "value": 85
+  },
+  {
+   "name": "Num -",
+   "key": "",
+   "value": 86
+  },
+  {
+   "name": "Num +",
+   "key": "",
+   "value": 87
+  },
+  {
+   "name": "Num Enter",
+   "key": "",
+   "value": 88
+  }
+ ],
+ "special": [
+  {
+   "name": "鼠标左键",
+   "key": "",
+   "value": 1,
+   "mouse": 1,
+   "text": "mouse_text1"
+  },
+  {
+   "name": "鼠标中键",
+   "key": "",
+   "value": 4,
+   "mouse": 1,
+   "text": "mouse_text2"
+  },
+  {
+   "name": "鼠标右键",
+   "key": "",
+   "value": 2,
+   "mouse": 1,
+   "text": "mouse_text3"
+  },
+  {
+   "name": "鼠标向上滚动",
+   "key": "",
+   "value": 1,
+   "mouse": 3,
+   "text": "mouse_text4"
+  },
+  {
+   "name": "鼠标向下滚动",
+   "key": "",
+   "value": 255,
+   "mouse": 3,
+   "text": "mouse_text5"
+  },
+  {
+   "name": "鼠标前进键",
+   "key": "",
+   "value": 16,
+   "mouse": 1,
+   "text": "mouse_text6"
+  },
+  {
+   "name": "鼠标后退键",
+   "key": "",
+   "value": 8,
+   "mouse": 1,
+   "text": "mouse_text7"
+  },
+  {
+   "name": "我的电脑",
+   "key": "",
+   "value": 404,
+   "medium": 1,
+   "text": "medium_text1"
+  },
+  {
+   "name": "计算器",
+   "key": "",
+   "value": 402,
+   "medium": 1,
+   "text": "medium_text2"
+  },
+  {
+   "name": "邮箱",
+   "key": "",
+   "value": 394,
+   "medium": 1,
+   "text": "medium_text3"
+  },
+  {
+   "name": "多媒体",
+   "key": "",
+   "value": 387,
+   "medium": 1,
+   "text": "medium_text4"
+  },
+  {
+   "name": "播放/暂停",
+   "key": "",
+   "value": 205,
+   "medium": 1,
+   "text": "medium_text5"
+  },
+  {
+   "name": "播放停止",
+   "key": "",
+   "value": 183,
+   "medium": 1,
+   "text": "medium_text6"
+  },
+  {
+   "name": "上一首",
+   "key": "",
+   "value": 182,
+   "medium": 1,
+   "text": "medium_text7"
+  },
+  {
+   "name": "下一首",
+   "key": "",
+   "value": 181,
+   "medium": 1,
+   "text": "medium_text8"
+  },
+  {
+   "name": "音量 +",
+   "key": "",
+   "value": 233,
+   "medium": 1,
+   "text": "medium_text9"
+  },
+  {
+   "name": "音量 -",
+   "key": "",
+   "value": 234,
+   "medium": 1,
+   "text": "medium_text10"
+  },
+  {
+   "name": "静音",
+   "key": "",
+   "value": 226,
+   "medium": 1,
+   "text": "medium_text11"
+  },
+  {
+   "name": "主页",
+   "key": "",
+   "value": 547,
+   "medium": 1,
+   "text": "medium_text12"
+  },
+  {
+   "name": "刷新",
+   "key": "",
+   "value": 551,
+   "medium": 1,
+   "text": "medium_text13"
+  },
+  {
+   "name": "前进",
+   "key": "",
+   "value": 549,
+   "medium": 1,
+   "text": "medium_text14"
+  },
+  {
+   "name": "后退",
+   "key": "",
+   "value": 548,
+   "medium": 1,
+   "text": "medium_text15"
+  },
+  {
+   "name": "收藏",
+   "key": "",
+   "value": 554,
+   "medium": 1,
+   "text": "medium_text16"
+  },
+  {
+   "name": "搜索",
+   "key": "",
+   "value": 545,
+   "medium": 1,
+   "text": "medium_text17"
+  }
+ ],
+ "fighting68": [
+  [
+   {
+    "className": "Esc isbg",
+    "value": 0,
+    "name": "Esc",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 41,
+    "keyCode": "Escape"
+   },
+   {
+    "className": "",
+    "value": 17,
+    "name": "1 !",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 30,
+    "keyCode": "Digit1"
+   },
+   {
+    "className": "",
+    "value": 18,
+    "name": "2 @",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 31,
+    "keyCode": "Digit2"
+   },
+   {
+    "className": "",
+    "value": 19,
+    "name": "3 #",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 32,
+    "keyCode": "Digit3"
+   },
+   {
+    "className": "",
+    "value": 20,
+    "name": "4 $",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 33,
+    "keyCode": "Digit4"
+   },
+   {
+    "className": "",
+    "value": 21,
+    "name": "5 %",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 34,
+    "keyCode": "Digit5"
+   },
+   {
+    "className": "",
+    "value": 22,
+    "name": "6 ^",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 35,
+    "keyCode": "Digit6"
+   },
+   {
+    "className": "",
+    "value": 23,
+    "name": "7 &",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 36,
+    "keyCode": "Digit7"
+   },
+   {
+    "className": "",
+    "value": 24,
+    "name": "8 *",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 37,
+    "keyCode": "Digit8"
+   },
+   {
+    "className": "",
+    "value": 25,
+    "name": "9 (",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 38,
+    "keyCode": "Digit9"
+   },
+   {
+    "className": "",
+    "value": 26,
+    "name": "0 )",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 39,
+    "keyCode": "Digit0"
+   },
+   {
+    "className": "",
+    "value": 27,
+    "name": "ˉ -",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 45,
+    "keyCode": "Minus"
+   },
+   {
+    "className": "",
+    "value": 28,
+    "name": "= +",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 46,
+    "keyCode": "Equal"
+   },
+   {
+    "className": "Backspace isbg",
+    "value": 92,
+    "name": "Backspace",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 42,
+    "keyCode": "Backspace"
+   },
+   {
+    "className": "isbg",
+    "value": 103,
+    "name": "Ins",
+    "isBorder": false,
+    "hegith": 0,
+    "keyType": 1,
+    "key": 73,
+    "keyCode": "Insert"
+   }
+  ],
+  [
+   {
+    "className": "Tab isbg",
+    "value": 32,
+    "name": "Tab",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 43,
+    "keyCode": "Tab"
+   },
+   {
+    "className": "",
+    "value": 33,
+    "name": "Q",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 20,
+    "keyCode": "KeyQ"
+   },
+   {
+    "className": "",
+    "value": 34,
+    "name": "W",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 26,
+    "keyCode": "KeyW"
+   },
+   {
+    "className": "",
+    "value": 35,
+    "name": "E",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 8,
+    "keyCode": "KeyE"
+   },
+   {
+    "className": "",
+    "value": 36,
+    "name": "R",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 21,
+    "keyCode": "KeyR"
+   },
+   {
+    "className": "",
+    "value": 37,
+    "name": "T",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 23,
+    "keyCode": "KeyT"
+   },
+   {
+    "className": "",
+    "value": 38,
+    "name": "Y",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 28,
+    "keyCode": "KeyY"
+   },
+   {
+    "className": "",
+    "value": 39,
+    "name": "U",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 24,
+    "keyCode": "KeyU"
+   },
+   {
+    "className": "",
+    "value": 40,
+    "name": "I",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 12,
+    "keyCode": "KeyI"
+   },
+   {
+    "className": "",
+    "value": 41,
+    "name": "O",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 18,
+    "keyCode": "KeyO"
+   },
+   {
+    "className": "",
+    "value": 42,
+    "name": "P",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 19,
+    "keyCode": "KeyP"
+   },
+   {
+    "className": "",
+    "value": 43,
+    "name": "[ {",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 47,
+    "keyCode": "BracketLeft"
+   },
+   {
+    "className": "",
+    "value": 44,
+    "name": "] }",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 48,
+    "keyCode": "BracketRight"
+   },
+   {
+    "className": "key-line",
+    "value": 60,
+    "name": "\\ | ",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 49,
+    "keyCode": "Backslash"
+   },
+   {
+    "className": "isbg",
+    "value": 106,
+    "name": "Del",
+    "isBorder": false,
+    "hegith": 0,
+    "keyType": 1,
+    "key": 76,
+    "keyCode": "Delete"
+   }
+  ],
+  [
+   {
+    "className": "Caps isbg",
+    "value": 48,
+    "name": "Caps",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 57,
+    "keyCode": "CapsLock"
+   },
+   {
+    "className": "",
+    "value": 49,
+    "name": "A",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 4,
+    "keyCode": "KeyA"
+   },
+   {
+    "className": "",
+    "value": 50,
+    "name": "S",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 22,
+    "keyCode": "KeyS"
+   },
+   {
+    "className": "",
+    "value": 51,
+    "name": "D",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 7,
+    "keyCode": "KeyD"
+   },
+   {
+    "className": "",
+    "value": 52,
+    "name": "F",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 9,
+    "keyCode": "KeyF"
+   },
+   {
+    "className": "",
+    "value": 53,
+    "name": "G",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 10,
+    "keyCode": "KeyG"
+   },
+   {
+    "className": "",
+    "value": 54,
+    "name": "H",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 11,
+    "keyCode": "KeyH"
+   },
+   {
+    "className": "",
+    "value": 55,
+    "name": "J",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 13,
+    "keyCode": "KeyJ"
+   },
+   {
+    "className": "",
+    "value": 56,
+    "name": "K",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 14,
+    "keyCode": "KeyK"
+   },
+   {
+    "className": "",
+    "value": 57,
+    "name": "L",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 15,
+    "keyCode": "KeyL"
+   },
+   {
+    "className": "",
+    "value": 58,
+    "name": "; :",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 51,
+    "keyCode": "Semicolon"
+   },
+   {
+    "className": "",
+    "value": 59,
+    "name": "' \"",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 56,
+    "keyCode": "Quote"
+   },
+   {
+    "className": "Enter isbg",
+    "value": 76,
+    "name": "Enter",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 40,
+    "keyCode": "Enter"
+   },
+   {
+    "className": "isbg",
+    "value": 105,
+    "name": "PgUp",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 75,
+    "keyCode": "PageUp"
+   }
+  ],
+  [
+   {
+    "className": "ShiftMax isbg",
+    "value": 64,
+    "name": "Shift",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 225,
+    "keyCode": "ShiftLeft"
+   },
+   {
+    "className": "",
+    "value": 65,
+    "name": "Z",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 29,
+    "keyCode": "KeyZ"
+   },
+   {
+    "className": "",
+    "value": 66,
+    "name": "X",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 27,
+    "keyCode": "KeyX"
+   },
+   {
+    "className": "",
+    "value": 67,
+    "name": "C",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 6,
+    "keyCode": "KeyC"
+   },
+   {
+    "className": "",
+    "value": 68,
+    "name": "V",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 25,
+    "keyCode": "KeyV"
+   },
+   {
+    "className": "",
+    "value": 69,
+    "name": "B",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 5,
+    "keyCode": "KeyB"
+   },
+   {
+    "className": "",
+    "value": 70,
+    "name": "N",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 17,
+    "keyCode": "KeyN"
+   },
+   {
+    "className": "",
+    "value": 71,
+    "name": "M",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 16,
+    "keyCode": "KeyM"
+   },
+   {
+    "className": "",
+    "value": 72,
+    "name": ", <",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 54,
+    "keyCode": "Comma"
+   },
+   {
+    "className": "",
+    "value": 73,
+    "name": ". >",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 55,
+    "keyCode": "Period"
+   },
+   {
+    "className": "",
+    "value": 74,
+    "name": "/ ?",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 56,
+    "keyCode": "Slash"
+   },
+   {
+    "className": "Shift isbg",
+    "value": 75,
+    "name": "Shift",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 229,
+    "keyCode": "ShiftRight"
+   },
+   {
+    "className": "operate up isbg",
+    "value": 90,
+    "name": "↑",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 82,
+    "keyCode": "ArrowUp"
+   },
+   {
+    "className": "isbg",
+    "value": 108,
+    "name": "PgDn",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 78,
+    "keyCode": "PageDown"
+   }
+  ],
+  [
+   {
+    "className": "ctrl isbg w55",
+    "value": 80,
+    "name": "Ctrl",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 224,
+    "keyCode": "ControlLeft"
+   },
+   {
+    "className": "isbg w55",
+    "value": 81,
+    "name": "Win",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 227,
+    "keyCode": "MetaLeft"
+   },
+   {
+    "className": "isbg w55",
+    "value": 82,
+    "name": "Alt",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 226,
+    "keyCode": "AltLeft"
+   },
+   {
+    "className": "Spacebar-68",
+    "value": 83,
+    "name": "Spacebar",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 44,
+    "keyCode": "Space"
+   },
+   {
+    "className": " isbg ",
+    "value": 84,
+    "name": "Alt",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 230,
+    "keyCode": "AltRight"
+   },
+   {
+    "className": " isbg",
+    "value": 85,
+    "name": "Fn",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 0,
+    "keyCode": "-1"
+   },
+   {
+    "className": " isbg  ",
+    "value": 87,
+    "name": "Ctrl",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 228,
+    "keyCode": "ControlRight"
+   },
+   {
+    "className": "w50 isbg",
+    "value": 88,
+    "name": "←",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 80,
+    "keyCode": "ArrowLeft"
+   },
+   {
+    "className": " up",
+    "value": 89,
+    "name": "↓",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 81,
+    "keyCode": "ArrowDown"
+   },
+   {
+    "className": "w50 isbg",
+    "value": 91,
+    "name": "→",
+    "isBorder": false,
+    "hegith": 0,
+    "key": 79,
+    "keyCode": "ArrowRight"
+   }
+  ]
+ ]
+}

@@ -10,18 +10,19 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -103,7 +104,7 @@ class Window(QWidget):
 
     def _build(self) -> None:
         self.setWindowTitle("Fighting 68")
-        self.resize(880, 640)
+        self.resize(1000, 640)
 
         header = QHBoxLayout()
         self.status = QLabel("connecting…")
@@ -124,12 +125,31 @@ class Window(QWidget):
         root.addWidget(tabs)
 
     def _sensitivity_tab(self) -> QWidget:
-        self.key_list = QListWidget()
-        self.key_list.currentItemChanged.connect(self._load_rt_form)
-        for slot in sorted(layout.LAYOUT):
-            item = QListWidgetItem(f"{layout.LAYOUT[slot]}   (slot {slot})")
-            item.setData(ROLE, slot)
-            self.key_list.addItem(item)
+        self.key_group = QButtonGroup(self)
+        self.key_group.setExclusive(True)
+        self.key_group.idClicked.connect(self._load_rt_form)
+
+        board = QWidget()
+        board.setStyleSheet("QPushButton:checked { background-color: #4a90d9; color: white; }")
+        grid = QGridLayout(board)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(3)
+        grid.setVerticalSpacing(3)
+        for row, keys in enumerate(layout.ROWS):
+            column = 0
+            for slot, width in keys:
+                button = QPushButton(layout.LAYOUT[slot])
+                button.setCheckable(True)
+                button.setFixedHeight(38)
+                button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                span = round(width * 4)  # 4 grid columns to the key unit
+                grid.addWidget(button, row, column, 1, span)
+                self.key_group.addButton(button, slot)
+                column += span
+        for column in range(sum(w for _, w in layout.ROWS[0]) * 4):
+            grid.setColumnStretch(column, 1)
+        grid.setRowStretch(len(layout.ROWS), 1)  # empty row so the keys stay put
+        self.key_group.button(sorted(layout.LAYOUT)[0]).setChecked(True)
 
         self.rt_trigger = self._mm_box()
         self.rt_down = self._mm_box()
@@ -163,9 +183,9 @@ class Window(QWidget):
         inner.addStretch(1)
 
         splitter = QSplitter()
-        splitter.addWidget(self.key_list)
+        splitter.addWidget(board)
         splitter.addWidget(panel)
-        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([620, 380])
         return splitter
 
     def _socd_tab(self) -> QWidget:
@@ -262,8 +282,7 @@ class Window(QWidget):
     # ------------------------------------------------------------------- state
 
     def _current_slot(self) -> int:
-        item = self.key_list.currentItem()
-        return item.data(ROLE) if item else 0
+        return self.key_group.checkedId()
 
     def _rt_record(self, slot: int) -> bytes:
         return self.regions["rt"][8 * slot : 8 * slot + 8]

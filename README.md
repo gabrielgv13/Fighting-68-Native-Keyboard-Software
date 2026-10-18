@@ -34,10 +34,11 @@ region byte for byte:
 > uv run python -m fighting68 gui
 ```
 
-The same four areas as the CLI, in one window: **Sensitivity** (pick a cap, set
-its actuation point and press/release sensitivity, switch type and rapid-trigger
-flags), **SOCD** (add and remove rules), **Settings** (the board-wide block) and
-**Calibration** (runs for 20 s and fills a per-key table as the reports arrive).
+The same four areas as the CLI, in one window. **Sensitivity** draws the board
+itself — the 65 keys at their real widths — and clicking one fills the form with
+its actuation point, press/release sensitivity, switch type and rapid-trigger
+flags. **SOCD** adds and removes rules, **Settings** is the board-wide block and
+**Calibration** runs for 20 s and fills a per-key table as the reports arrive.
 **Backup…** / **Restore…** in the header do what `dump` / `restore` do. Device
 work runs off the GUI thread and each edit opens the board on its own, so nothing
 blocks the window and nothing is written unless you press an Apply button.

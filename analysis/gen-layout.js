@@ -2,7 +2,30 @@
 const fs = require('fs');
 const c = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 
-const layout = c.fighting68.flat().map((k) => [k.value, k.name, k.key]);
+const rows = c.fighting68;
+const layout = rows.flat().map((k) => [k.value, k.name, k.key]);
+
+// Widths in key units. The bundle only marks the wide caps by class name
+// (.Backspace, .Tab, .Caps, .Enter, .ShiftMax, .Shift, .w55, .Spacebar-68,
+// .key-line) and lets flexbox absorb the slack, so the units themselves are the
+// standard ANSI 65% geometry the row structure matches exactly: 16 per row.
+const WIDTH_BY_CLASS = {
+  Backspace: 2,
+  Tab: 1.5,
+  'key-line': 1.5,
+  Caps: 1.75,
+  Enter: 2.25,
+  ShiftMax: 2.25,
+  Shift: 1.75,
+  w55: 1.25,
+  'Spacebar-68': 6.25,
+};
+const widthOf = (className) => {
+  for (const token of String(className || '').split(/\s+/)) {
+    if (token in WIDTH_BY_CLASS) return WIDTH_BY_CLASS[token];
+  }
+  return 1;
+};
 
 const usage = new Map(); // name -> hid usage
 const reverse = new Map(); // usage -> name
@@ -17,6 +40,12 @@ out += '# LAYOUT maps a key-map slot to its physical cap label; USAGE maps a lab
 out += 'LAYOUT = {\n';
 for (const [i, n] of layout) out += `    ${i}: ${q(n)},\n`;
 out += '}\n\n';
+out += '# Physical rows of (slot, width in key units), top to bottom.\n';
+out += 'ROWS = [\n';
+for (const row of rows) {
+  out += '    [' + row.map((k) => `[${k.value}, ${widthOf(k.className)}]`).join(', ') + '],\n';
+}
+out += ']\n\n';
 out += '# The usage id each cap sends by default, and the slot a rule for it lives in.\n';
 out += 'SLOT_BY_USAGE = {\n';
 const seen = new Set();
@@ -32,4 +61,9 @@ out += '}\n\nUSAGE_NAMES = {\n';
 for (const [v, n] of reverse) out += `    ${v}: ${q(n)},\n`;
 out += '}\n';
 fs.writeFileSync(process.argv[3], out);
-console.log('layout entries', layout.length, 'usage names', usage.size, 'bytes', out.length);
+
+for (const row of rows) {
+  const total = row.reduce((sum, k) => sum + widthOf(k.className), 0);
+  if (total !== 16) throw new Error(`row sums to ${total} units, expected 16`);
+}
+console.log('rows', rows.length, 'keys', layout.length, 'bytes', out.length);

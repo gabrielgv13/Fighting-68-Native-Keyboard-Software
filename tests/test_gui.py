@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from fighting68 import gui
+from fighting68 import gui, layout
 from fighting68.protocol import RT_BOTTOM, RT_WHOLE, encode_rt, encode_socd, patch_settings
 
 SLOT_A, SLOT_D = 49, 51
@@ -36,12 +36,19 @@ class GuiTest(unittest.TestCase):
             ),
         }
         self.window._fill_all()
-        for row in range(self.window.key_list.count()):
-            if self.window.key_list.item(row).data(gui.ROLE) == SLOT_A:
-                self.window.key_list.setCurrentRow(row)
-                break
+        self.window.key_group.button(SLOT_A).click()
+
+    def test_the_panel_is_laid_out_as_the_keyboard(self):
+        self.assertEqual(len(self.window.key_group.buttons()), 68)
+        for row in layout.ROWS:
+            self.assertEqual(sum(width for _, width in row), 16, "rows must line up")
+
+    def test_clicking_a_key_selects_it(self):
+        self.window.key_group.button(SLOT_D).click()
+        self.assertEqual(self.window._current_slot(), SLOT_D)
 
     def test_sensitivity_form_round_trips_the_record(self):
+        self.assertEqual(self.window._current_slot(), SLOT_A)
         self.assertEqual(self.window.rt_trigger.value(), 1.2)
         self.assertEqual(self.window.rt_up.value(), 0.08)
         self.assertTrue(self.window.rt_whole.isChecked())

@@ -151,6 +151,9 @@ SLOT_BY_USAGE = {
     79: 91,
 }
 
+# The inverse: a key-map slot to the usage id it sends, for the keys that have one.
+USAGE_BY_SLOT = {slot: usage for usage, slot in SLOT_BY_USAGE.items()}
+
 USAGE = {
     "A": 4,
     "B": 5,

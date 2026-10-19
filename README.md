@@ -37,11 +37,38 @@ region byte for byte:
 The same four areas as the CLI, in one window. **Sensitivity** draws the board
 itself — the 65 keys at their real widths — and clicking one fills the form with
 its actuation point, press/release sensitivity, switch type and rapid-trigger
-flags. **SOCD** adds and removes rules, **Settings** is the board-wide block and
-**Calibration** runs for 20 s and fills a per-key table as the reports arrive.
+flags. **SOCD** adds and removes rules — its own board feeds the pickers, click a
+key for Key 1 and the next for Key 2 — **Behaviour** is the board-wide block
+(hover a label for what it does) and **Calibration** runs for 20 s and fills a
+per-key table as the reports arrive, with the board coloured red (not
+calibrated), green (calibrated) or light blue (improved). Keys on the
+Sensitivity tab click-toggle into a selection — **Select all** grabs the whole
+board — and **Apply to selection** writes the form's record to every one of
+them.
 **Backup…** / **Restore…** in the header do what `dump` / `restore` do. Device
 work runs off the GUI thread and each edit opens the board on its own, so nothing
 blocks the window and nothing is written unless you press an Apply button.
+
+### Developing without the board
+
+`fighting68.fake` is an in-memory Fighting 68 that speaks the real wire
+protocol — chunked region reads/writes, short commands and the `0xFB`
+calibration stream — so features can be built and tested with no keyboard
+plugged in, then validated on hardware unchanged:
+
+```python
+from fighting68.fake import open_fake
+from fighting68.protocol import encode_rt
+
+with open_fake() as kb:            # drop-in for Keyboard.open()
+    kb.write_region("rt", ...)
+```
+
+`tests/test_fake.py` drives the actual `Keyboard` class against it (43 tests,
+none need USB). `FakeKeyboard(travel_max={49: 385})` scripts the calibration
+measurements, and `fake.dump()` returns the same hex-per-region shape the CLI's
+`dump` writes, for before/after comparisons.
+
 
 ### Hall-effect sensitivity and rapid trigger
 

@@ -13,6 +13,7 @@ verified against a real Fighting 68 plugged into the machine.
 
 ```console
 > uv sync
+> uv run python -m fighting68              # open the GUI and connect to the real keyboard
 > uv run python -m fighting68 list          # is the board there?
 > uv run python -m fighting68 info          # board-wide Hall-effect settings
 > uv run python -m fighting68 rt            # per-key sensitivity overrides
@@ -40,8 +41,10 @@ its actuation point, press/release sensitivity, switch type and rapid-trigger
 flags. **SOCD** adds and removes rules — its own board feeds the pickers, click a
 key for Key 1 and the next for Key 2 — **Behaviour** is the board-wide block
 (hover a label for what it does) and **Calibration** runs for 20 s and fills a
-per-key table as the reports arrive, with the board coloured red (not
-calibrated), green (calibrated) or light blue (improved). Keys on the
+per-key table with each pressed key's measured travel, with the board coloured
+red (not measured), green (measured) or light blue (pressed deeper). It only
+reads the board — it never enters the firmware's destructive calibration mode.
+Keys on the
 Sensitivity tab click-toggle into a selection — **Select all** grabs the whole
 board — and **Apply to selection** writes the form's record to every one of
 them.
@@ -112,10 +115,18 @@ both keys, and so does this tool.
 
 ### Calibration
 
-`calibrate` puts the board into its calibration mode and summarises the live
-reports it sends back. Press each key fully while it runs — that is what the
-firmware measures. `travel` is the deepest movement it saw, `of` is the full
-travel of the switch.
+`calibrate` measures each key's travel **without touching the board's stored
+calibration**. Press each key fully while it runs; the firmware already streams
+`0xFB` reports in normal mode carrying the key slot, the live travel and the
+switch's full travel, and the tool just records the deepest movement it sees.
+`travel` is the deepest movement measured, `of` is the full travel of the switch.
+Only keys you actually press appear in the results.
+
+The firmware's own calibration mode (cmd `0x64` enter / `0x65` save / `0x0F`
+clear) is deliberately not used here: on this board it re-measures every key
+the moment it is entered, so an accidental click overwrites keys you never
+pressed. Use the vendor's web configurator when you really want to rewrite the
+board's calibration data.
 
 ## The wire protocol
 

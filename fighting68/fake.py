@@ -66,6 +66,7 @@ class FakeKeyboard:
         # key slot. Anything not listed measures a plausible 3.00-3.85 mm.
         self.travel_max: dict[int, int] = dict(travel_max or {})
         self.calibrating = False
+        self.reporting = False  # normal-mode live-travel stream (no calibration)
         self.resets: list[int] = []
         self.log: list[tuple[int, int, bytes]] = []  # (cmd, offset, payload) of every request
         self.unknown: list[int] = []
@@ -94,8 +95,9 @@ class FakeKeyboard:
             region = self.regions[_WRITE_CMDS[cmd]]
             region[offset : offset + len(payload)] = payload
             self._replies.append(self._reply(cmd, b""))
-        elif cmd == 0x0F:  # reset(what)
+        elif cmd == 0x0F:  # reset(what): also exits a calibration session
             self.resets.append(pkt[2])
+            self.calibrating = False
             self._replies.append(self._reply(cmd, b""))
         elif cmd == 0x64:  # calibration on
             self.calibrating, self._cal_slot = True, 0
@@ -109,10 +111,10 @@ class FakeKeyboard:
         return len(data)
 
     def read(self, count: int, timeout_ms: int = TIMEOUT_MS) -> bytes:
-        """Next queued reply, else the next calibration report, else a timeout."""
+        """Next queued reply, else the next key report, else a timeout."""
         if self._replies:
             return self._replies.pop(0)
-        if self.calibrating:
+        if self.calibrating or self.reporting:
             return self._calibration_report()
         return b""  # hidapi's timeout: an empty report, which Keyboard treats as no reply
 

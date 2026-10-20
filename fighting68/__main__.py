@@ -230,16 +230,15 @@ def usage_label(usage: int) -> str:
 
 
 def cmd_calibrate(args: argparse.Namespace) -> None:
-    print("calibrating - press each key fully, Ctrl-C to stop")
+    print("measuring - press each key fully, Ctrl-C to stop (read-only, nothing is written)")
     with open_keyboard(args) as kb:
-        seen = kb.calibrate_for(args.seconds or float("inf"))
+        seen = kb.measure_travel(args.seconds or float("inf"))
     for slot, row in sorted(seen.items()):
-        ok = "ok " if row["status"] else "???"
         print(
-            f"{slot:>4}  {layout.LAYOUT.get(slot, '?'):<10} {ok} "
+            f"{slot:>4}  {layout.LAYOUT.get(slot, '?'):<10} "
             f"travel={row['travel'] / 10:.1f}mm of {row['travel_max'] / 10:.1f}mm"
         )
-    print(f"{len(seen)} keys reported")
+    print(f"{len(seen)} keys measured")
 
 
 def cmd_gui(args: argparse.Namespace) -> None:
@@ -252,7 +251,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="fighting68", description=__doc__)
     p.add_argument("--vid", type=lambda t: int(t, 0), default=0x0C45, help="USB vendor id")
     p.add_argument("--pid", type=lambda t: int(t, 0), default=0x8030, help="USB product id")
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(dest="command")
+    p.set_defaults(func=cmd_gui)
 
     sub.add_parser("list", help="show the keyboard's HID collections").set_defaults(func=cmd_list)
     sub.add_parser("keys", help="show the key map slots against the physical cap labels").set_defaults(func=cmd_keys)
@@ -288,7 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
     socd.add_argument("--clear", action="store_true", help="remove the rule")
     socd.set_defaults(func=cmd_socd)
 
-    cal = sub.add_parser("calibrate", help="run calibration and report each key's measured travel")
+    cal = sub.add_parser("calibrate", help="measure each pressed key's travel without changing the board")
     cal.add_argument("--seconds", type=float, help="stop after this many seconds")
     cal.set_defaults(func=cmd_calibrate)
     return p

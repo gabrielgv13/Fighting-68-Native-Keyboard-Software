@@ -304,18 +304,21 @@ class Window(QWidget):
         return group
 
     def _calibration_tab(self) -> QWidget:
-        self.calibration_button = QPushButton("Start calibration")
+        self.calibration_button = QPushButton("Start measuring")
         self.calibration_button.clicked.connect(self._calibrate)
-        hint = QLabel(f"Press every key fully while it runs ({CALIBRATION_SECONDS:.0f} s).")
+        hint = QLabel(
+            f"Press each key fully to measure its travel ({CALIBRATION_SECONDS:.0f} s). "
+            "This only reads the board; it never changes calibration."
+        )
 
         board, self.cal_buttons = self._board(checkable=False)
         board.setEnabled(False)  # display only
-        self.cal_colors: dict[int, str] = {}  # absent = calibrated (green)
+        self.cal_colors: dict[int, str] = {}  # absent = measured (green)
         self._cal_seen: dict[int, dict] = {}
         self._paint_calibration()
 
         legend = QHBoxLayout()
-        for colour, text in ((COLOR_GREEN, "Calibrated"), (COLOR_RED, "Not calibrated"), (COLOR_BLUE, "Improved")):
+        for colour, text in ((COLOR_GREEN, "Measured"), (COLOR_RED, "Not measured"), (COLOR_BLUE, "Pressed deeper")):
             swatch = QLabel()
             swatch.setFixedSize(14, 14)
             swatch.setStyleSheet(f"background-color: {colour}; border: 1px solid #666;")
@@ -497,10 +500,10 @@ class Window(QWidget):
             previous = self._cal_seen.get(slot)
             if previous is None:
                 self.cal_colors[slot] = COLOR_GREEN  # first time this key measured
-            elif values["travel_max"] > previous["travel_max"]:
-                self.cal_colors[slot] = COLOR_BLUE  # went deeper than last time: improved
+            elif values["travel"] > previous["travel"]:
+                self.cal_colors[slot] = COLOR_BLUE  # pressed deeper than before
             elif slot in self.cal_colors and self.cal_colors[slot] != COLOR_BLUE:
-                self.cal_colors[slot] = COLOR_GREEN  # measured again without improving
+                self.cal_colors[slot] = COLOR_GREEN  # measured again without going deeper
             self._cal_seen[slot] = values
         self._paint_calibration()
 
@@ -649,14 +652,14 @@ class Window(QWidget):
 
     def _calibrate(self) -> None:
         self.calibration_button.setEnabled(False)
-        self.status.setText("calibrating…")
-        self.cal_colors = {slot: COLOR_RED for slot in self.cal_buttons}  # every key starts uncalibrated
+        self.status.setText("measuring…")
+        self.cal_colors = {slot: COLOR_RED for slot in self.cal_buttons}  # every key starts unmeasured
         self._cal_seen = {}
         self._paint_calibration()
 
         def job() -> dict:
             with Keyboard.open(self.vid, self.pid) as kb:
-                return kb.calibrate_for(CALIBRATION_SECONDS, self.jobs.progress.emit)
+                return kb.measure_travel(CALIBRATION_SECONDS, self.jobs.progress.emit)
 
         self.jobs.submit("calibrate", job)
 
@@ -669,7 +672,7 @@ class Window(QWidget):
         elif name == "calibrate":
             self._fill_calibration(result)
             self.calibration_button.setEnabled(True)
-            self.status.setText(f"calibration finished, {len(result)} keys reported")
+            self.status.setText(f"measured {len(result)} key(s)")
         else:
             self.status.setText(str(result))
             if name in ("write", "socd", "restore"):

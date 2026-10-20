@@ -174,6 +174,41 @@ class CalibrationTest(unittest.TestCase):
         self.assertTrue(calls, "on_progress never fired")
         self.assertGreaterEqual(calls[-1], calls[0])
 
+    def test_discard_calibration_leaves_calibration_mode_without_saving(self):
+        with open_fake() as kb:
+            kb.calibrate(True)
+            self.assertTrue(kb.dev.calibrating)
+            kb.discard_calibration()
+            self.assertFalse(kb.dev.calibrating)
+            self.assertEqual(kb.dev.resets, [5])
+
+    def test_collect_calibration_stays_in_calibration_mode_until_committed(self):
+        with open_fake(travel_max={49: 385}) as kb:
+            seen, interrupted = kb.collect_calibration(0.3)
+            self.assertTrue(kb.dev.calibrating)  # caller still has to commit
+            self.assertFalse(interrupted)
+            self.assertEqual(seen[49]["travel_max"], 385)
+            kb.save_calibration()
+            self.assertFalse(kb.dev.calibrating)
+
+    def test_interrupted_calibration_discards_instead_of_saving(self):
+        with open_fake() as kb:
+            kb.collect_calibration = lambda seconds, on_progress=None: ({}, True)
+            self.assertEqual(kb.calibrate_for(1.0), {})
+            self.assertFalse(kb.dev.calibrating)
+            self.assertEqual(kb.dev.resets, [5])
+
+    def test_measure_travel_reads_live_reports_without_touching_the_board(self):
+        with open_fake(travel_max={49: 385}) as kb:
+            kb.dev.reporting = True  # firmware streams pressed-key travel in normal mode
+            seen = kb.measure_travel(0.3)
+            self.assertFalse(kb.dev.calibrating)  # never entered calibration mode
+            self.assertEqual(kb.dev.resets, [])
+            self.assertEqual(kb.dev.log, [])  # no commands sent: read-only
+            self.assertIn(49, seen)
+            self.assertEqual(seen[49]["travel_max"], 385)
+            self.assertEqual(seen[49]["status"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -289,21 +289,60 @@ class Keyboard:
         self.command(0x0F, what, 0, 0, 0)
 
     def calibrate(self, on: bool) -> None:
-        """Enter or leave calibration mode (driver: `getSendReportCalibration` /
-        `hadnleCalibration`). While it is on the board streams CALIBRATION_REPORT."""
+        """Enter (0x64) or save-and-leave (0x65) calibration mode — the web
+        driver's `getSendReportCalibration` / "Save Calibration". While on, the
+        board streams CALIBRATION_REPORT."""
         self.command(0x64 if on else 0x65, 0, 0, 0, 0)
+
+    def save_calibration(self) -> None:
+        """Leave calibration mode and commit what the firmware measured."""
+        self.calibrate(False)
+
+    def discard_calibration(self) -> None:
+        """Leave calibration mode without committing: the web driver's "Clear
+        Calibration" button sends cmd 0x0F arg 5, which also exits a session."""
+        self.command(0x0F, 5, 0, 0, 0)
 
     def read_report(self, timeout_ms: int = TIMEOUT_MS) -> bytes | None:
         """Next unsolicited report, or None if none arrives in time."""
         return bytes(self.dev.read(REPORT_LEN, timeout_ms)) or None
 
-    def calibrate_for(self, seconds: float, on_progress=None) -> dict[int, dict]:
-        """Run calibration and return per key {status, travel, travel_max}, with
-        travel in tenths of a mm. `on_progress` gets a copy of the running result
-        at most five times a second. Ctrl-C stops early and keeps what it saw."""
+    def measure_travel(self, seconds: float, on_progress=None) -> dict[int, dict]:
+        """Measure each pressed key's deepest travel WITHOUT entering the board's
+        calibration mode. In normal mode the firmware still streams 0xFB reports
+        for pressed keys carrying the slot, the live travel and the switch's full
+        travel, so nothing is written to the board. Returns per key {status,
+        travel, travel_max} for keys that were actually pressed (travel > 0)."""
         seen: dict[int, dict] = {}
         deadline = time.monotonic() + seconds
         last = 0.0
+        try:
+            while time.monotonic() < deadline:
+                report = self.read_report(500)
+                if not report or report[1] != CALIBRATION_REPORT:
+                    continue
+                live = decode_calibration(report)
+                if live["travel"] <= 0:
+                    continue  # resting key: not actually pressed
+                row = seen.setdefault(live["key"], {"status": 1, "travel": 0, "travel_max": live["travel_max"]})
+                row["travel"] = max(row["travel"], live["travel"])
+                row["travel_max"] = max(row["travel_max"], live["travel_max"])
+                if on_progress and time.monotonic() - last > 0.2:
+                    last = time.monotonic()
+                    on_progress(dict(seen))
+        except KeyboardInterrupt:
+            pass
+        return seen
+
+    def collect_calibration(self, seconds: float, on_progress=None) -> tuple[dict[int, dict], bool]:
+        """Enter calibration mode and stream reports for `seconds`, returning
+        (per-key measurements, interrupted). A key was pressed and calibrated
+        iff its `status` is non-zero. Does not leave calibration mode: the
+        caller commits with `save_calibration()` or `discard_calibration()`."""
+        seen: dict[int, dict] = {}
+        deadline = time.monotonic() + seconds
+        last = 0.0
+        interrupted = False
         self.calibrate(True)
         try:
             while time.monotonic() < deadline:
@@ -319,9 +358,17 @@ class Keyboard:
                     last = time.monotonic()
                     on_progress(dict(seen))
         except KeyboardInterrupt:
-            pass
-        finally:
-            self.calibrate(False)
+            interrupted = True
+        return seen, interrupted
+
+    def calibrate_for(self, seconds: float, on_progress=None) -> dict[int, dict]:
+        """Stream calibration for `seconds` and save. A Ctrl-C instead discards
+        the session, so unpressed keys are never committed, and keeps what it saw."""
+        seen, interrupted = self.collect_calibration(seconds, on_progress)
+        if interrupted:
+            self.discard_calibration()
+        else:
+            self.save_calibration()
         return seen
 
     def commit(self) -> None:

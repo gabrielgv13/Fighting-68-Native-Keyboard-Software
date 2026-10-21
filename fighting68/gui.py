@@ -4,9 +4,11 @@ board-wide Hall-effect settings and calibration."""
 from __future__ import annotations
 
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -19,8 +21,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QSplitter,
@@ -32,6 +36,20 @@ from PySide6.QtWidgets import (
 )
 
 from . import layout
+from .macro import (
+    MacroAction,
+    MacroEvent,
+    TRIGGER_REPEAT,
+    TRIGGER_ROUTINE,
+    TRIGGER_TOGGLE,
+    compile_timeline,
+    decode_macros,
+    decode_trigger,
+    encode_macros,
+    encode_trigger,
+    events_to_actions,
+    macro_keys,
+)
 from .protocol import (
     EMPTY_KEY,
     REGIONS,
@@ -44,6 +62,7 @@ from .protocol import (
     decode_key,
     decode_rt,
     decode_settings,
+    encode_key,
     encode_rt,
     encode_socd,
     patch_settings,
@@ -52,12 +71,11 @@ from .protocol import (
 ROLE = Qt.ItemDataRole.UserRole
 
 REPORT_RATES = {0: "0 (unset)", 1: "1 kHz", 2: "4 kHz", 3: "8 kHz"}
-CALIBRATION_SECONDS = 20.0
-
 # Calibration board colours.
 COLOR_RED = "#d9534f"  # not calibrated
 COLOR_GREEN = "#5cb85c"  # calibrated
 COLOR_BLUE = "#5bc0de"  # calibration improved
+COLOR_UNCALIBRATED = "#777777"  # no successful calibration report in this session
 
 SETTING_LABELS = {
     "rest_time": "Rest time",
@@ -120,11 +138,87 @@ class DeviceJobs(QObject):
         self.pool.submit(run)
 
 
+class MacroTimeline(QWidget):
+    """A video-editor style strip: each key action is a block on its own row,
+    positioned by start time and sized by its hold duration. Click a block to
+    select the action."""
+
+    clicked = Signal(int)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.actions: list[MacroAction] = []
+        self.selected: int | None = None
+        self.setMinimumHeight(140)
+        self._row = 22
+        self._gap = 4
+        self._left = 56
+        self._top = 24
+
+    def set_actions(self, actions: list[MacroAction], selected: int | None = None) -> None:
+        self.actions = actions
+        self.selected = selected
+        self.update()
+
+    def _time_span(self) -> int:
+        return max(1000, max((a.start_ms + max(a.duration_ms, 10) for a in self.actions), default=0))
+
+    def _block(self, index: int):
+        span = self._time_span()
+        px = (self.width() - self._left - 8) / span
+        action = self.actions[index]
+        x = self._left + action.start_ms * px
+        w = max(action.duration_ms, 10) * px
+        y = self._top + index * (self._row + self._gap)
+        return (x, y, max(w, 6), self._row)
+
+    def mousePressEvent(self, event) -> None:
+        for index in range(len(self.actions)):
+            x, y, w, h = self._block(index)
+            if x <= event.position().x() <= x + w and y <= event.position().y() <= y + h:
+                self.selected = index
+                self.clicked.emit(index)
+                self.update()
+                return
+        self.selected = None
+        self.clicked.emit(-1)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor("#1e1e1e"))
+        span = self._time_span()
+        px = (self.width() - self._left - 8) / span
+        names = macro_keys()
+
+        painter.setPen(QColor("#888888"))
+        step = 100 if span <= 1000 else 500
+        for ms in range(0, span + step, step):
+            x = self._left + ms * px
+            painter.drawLine(int(x), 0, int(x), self.height())
+            painter.drawText(int(x) + 2, 14, f"{ms}ms")
+
+        for index, action in enumerate(self.actions):
+            x, y, w, h = self._block(index)
+            colour = "#4a90d9" if index == self.selected else "#6b8fc0"
+            painter.setPen(QPen(QColor("#1a1a1a")))
+            painter.setBrush(QColor(colour))
+            painter.drawRect(int(x), int(y), int(w), int(h))
+            label = names.get(action.usage, f"0x{action.usage:02x}")
+            painter.setPen(QColor("white"))
+            painter.drawText(int(x) + 3, int(y) + h - 6, label)
+        painter.end()
+
+
 class Window(QWidget):
     def __init__(self, vid: int, pid: int) -> None:
         super().__init__()
         self.vid, self.pid = vid, pid
         self.regions: dict[str, bytes] = {}
+        # Keep the key records that macro bindings temporarily replace. These
+        # survive refreshes in this window; factory mappings are the fallback
+        # when the application starts with an already-bound macro.
+        self.macro_original_bindings: dict[str, dict[int, bytes]] = {"keys": {}, "fn": {}}
         self.jobs = DeviceJobs()
         self.jobs.done.connect(self._on_done)
         self.jobs.progress.connect(self._fill_calibration)
@@ -151,6 +245,7 @@ class Window(QWidget):
         tabs.addTab(self._socd_tab(), "SOCD")
         tabs.addTab(self._settings_tab(), "Behaviour")
         tabs.addTab(self._calibration_tab(), "Calibration")
+        tabs.addTab(self._macro_tab(), "Macro")
 
         root = QVBoxLayout(self)
         root.addLayout(header)
@@ -304,21 +399,29 @@ class Window(QWidget):
         return group
 
     def _calibration_tab(self) -> QWidget:
-        self.calibration_button = QPushButton("Start measuring")
+        self.calibration_button = QPushButton("Start recalibration")
         self.calibration_button.clicked.connect(self._calibrate)
-        hint = QLabel(
-            f"Press each key fully to measure its travel ({CALIBRATION_SECONDS:.0f} s). "
-            "This only reads the board; it never changes calibration."
-        )
+        hint = QLabel("Press each key you want to recalibrate. Successful keys turn green; untouched keys keep their current calibration.")
+        self.calibration_save_button = QPushButton("Save")
+        self.calibration_save_button.setEnabled(False)
+        self.calibration_save_button.clicked.connect(lambda: self._finish_calibration("save"))
+        self.calibration_cancel_button = QPushButton("Cancel")
+        self.calibration_cancel_button.setEnabled(False)
+        self.calibration_cancel_button.clicked.connect(lambda: self._finish_calibration("cancel"))
+        self._calibration_decision = None
+        self._calibration_stop = threading.Event()
+        self._calibration_active = False
+        self._calibration_color_snapshot: dict[int, str] = {}
+        self._calibration_seen_snapshot: dict[int, dict] = {}
 
         board, self.cal_buttons = self._board(checkable=False)
         board.setEnabled(False)  # display only
-        self.cal_colors: dict[int, str] = {}  # absent = measured (green)
+        self.cal_colors: dict[int, str] = {slot: COLOR_UNCALIBRATED for slot in self.cal_buttons}
         self._cal_seen: dict[int, dict] = {}
         self._paint_calibration()
 
         legend = QHBoxLayout()
-        for colour, text in ((COLOR_GREEN, "Measured"), (COLOR_RED, "Not measured"), (COLOR_BLUE, "Pressed deeper")):
+        for colour, text in ((COLOR_GREEN, "Calibrated in this session"), (COLOR_UNCALIBRATED, "Not changed")):
             swatch = QLabel()
             swatch.setFixedSize(14, 14)
             swatch.setStyleSheet(f"background-color: {colour}; border: 1px solid #666;")
@@ -335,6 +438,10 @@ class Window(QWidget):
         column = QVBoxLayout(left)
         column.setContentsMargins(0, 0, 0, 0)
         column.addWidget(self.calibration_button)
+        controls = QHBoxLayout()
+        controls.addWidget(self.calibration_save_button)
+        controls.addWidget(self.calibration_cancel_button)
+        column.addLayout(controls)
         column.addWidget(hint)
         column.addLayout(legend)
         column.addWidget(board, 1)
@@ -346,13 +453,401 @@ class Window(QWidget):
         body.addWidget(self.calibration_table, 1)
         return panel
 
+    def _macro_tab(self) -> QWidget:
+        self.macro_actions: dict[int, list[MacroAction]] = {}  # macro index -> timeline
+        self.macro_triggers: dict[int, dict] = {}  # macro index -> {"keys": set, "fn": set, "mode", "repeat"}
+        self.current_macro: int | None = None
+        self._selected_macro_action: int | None = None
+
+        # Compact macro library.
+        self.macro_list = QListWidget()
+        self.macro_list.currentRowChanged.connect(self._select_macro)
+        add = QPushButton("Add macro")
+        add.clicked.connect(self._add_macro)
+        remove = QPushButton("Remove")
+        remove.clicked.connect(self._remove_macro)
+        left = QWidget()
+        left_col = QVBoxLayout(left)
+        left_col.addWidget(QLabel("Macros"))
+        left_col.addWidget(self.macro_list, 1)
+        row = QHBoxLayout()
+        row.addWidget(add)
+        row.addWidget(remove)
+        left_col.addLayout(row)
+
+        # Main editor: the timeline stays prominent and directly selectable.
+        self.macro_timeline = MacroTimeline()
+        self.macro_timeline.setMinimumHeight(190)
+        self.macro_timeline.clicked.connect(self._select_action)
+
+        self.macro_key_combo = QComboBox()
+        for usage, label in sorted(macro_keys().items(), key=lambda item: item[1].lower()):
+            self.macro_key_combo.addItem(label, usage)
+        self.macro_type_combo = QComboBox()
+        self.macro_type_combo.addItem("Hold", "hold")
+        self.macro_type_combo.addItem("Tap", "tap")
+        self.macro_start = QSpinBox()
+        self.macro_start.setRange(0, 60_000)
+        self.macro_start.setSuffix(" ms")
+        self.macro_duration = QSpinBox()
+        self.macro_duration.setRange(0, 60_000)
+        self.macro_duration.setSuffix(" ms")
+
+        add_action = QPushButton("Add")
+        self.macro_add_action_button = add_action
+        add_action.setEnabled(False)
+        add_action.clicked.connect(self._add_action)
+        update_action = QPushButton("Update")
+        self.macro_update_action_button = update_action
+        update_action.setEnabled(False)
+        update_action.clicked.connect(self._update_action)
+        del_action = QPushButton("Delete")
+        self.macro_delete_action_button = del_action
+        del_action.setEnabled(False)
+        del_action.clicked.connect(self._delete_action)
+
+        action_editor = QGroupBox("Action")
+        action_row = QHBoxLayout(action_editor)
+        for label, widget in (
+            ("Key", self.macro_key_combo),
+            ("Type", self.macro_type_combo),
+            ("Start", self.macro_start),
+            ("Hold", self.macro_duration),
+        ):
+            field = QWidget()
+            field_col = QVBoxLayout(field)
+            field_col.setContentsMargins(0, 0, 0, 0)
+            field_col.addWidget(QLabel(label))
+            field_col.addWidget(widget)
+            action_row.addWidget(field, 1)
+        action_row.addWidget(add_action)
+        action_row.addWidget(update_action)
+        action_row.addWidget(del_action)
+
+        # Trigger mapping is available on demand, collapsed by default.
+        self.macro_trigger_layer = QComboBox()
+        self.macro_trigger_layer.addItem("Normal keys", "keys")
+        self.macro_trigger_layer.setItemData(
+            0, "A selected key starts this macro from the normal keyboard layer.", Qt.ItemDataRole.ToolTipRole
+        )
+        self.macro_trigger_layer.addItem("Fn + key combination", "fn")
+        self.macro_trigger_layer.setItemData(
+            1, "A selected key starts this macro while the keyboard's Fn layer is active.", Qt.ItemDataRole.ToolTipRole
+        )
+        self.macro_trigger_layer.setToolTip("Choose which keyboard layer contains the macro trigger.")
+        self.macro_trigger_layer.currentIndexChanged.connect(lambda _: self._paint_trigger_board())
+        self.macro_trigger_mode = QComboBox()
+        self.macro_trigger_mode.addItem("Routine", TRIGGER_ROUTINE)
+        self.macro_trigger_mode.setItemData(
+            0, "Play the macro once each time its trigger is activated.", Qt.ItemDataRole.ToolTipRole
+        )
+        self.macro_trigger_mode.addItem("Repeat playback", TRIGGER_REPEAT)
+        self.macro_trigger_mode.setItemData(
+            1, "Play the macro the selected number of times for each activation.", Qt.ItemDataRole.ToolTipRole
+        )
+        self.macro_trigger_mode.addItem("Toggle (press again to stop)", TRIGGER_TOGGLE)
+        self.macro_trigger_mode.setItemData(
+            2, "Start continuous playback; activate the trigger again to stop it.", Qt.ItemDataRole.ToolTipRole
+        )
+        self.macro_trigger_mode.setToolTip("Choose how playback behaves after the trigger is activated.")
+        self.macro_trigger_mode.currentIndexChanged.connect(lambda _: self._trigger_mode_changed())
+        self.macro_trigger_count = QSpinBox()
+        self.macro_trigger_count.setRange(1, 255)
+        self.macro_trigger_count.setSuffix("x")
+        self.macro_trigger_count.setToolTip("Number of playbacks per activation. Used only in Repeat playback mode.")
+
+        trigger_board, self.macro_trigger_buttons = self._board(on_click=self._toggle_trigger_key)
+        for slot, button in self.macro_trigger_buttons.items():
+            button.setToolTip(
+                f"{layout.LAYOUT[slot]}: click to add or remove this key as a macro trigger. "
+                "Each selected key is stored as an individual trigger."
+            )
+        trigger_board.setStyleSheet("QPushButton:checked { background-color: #4a90d9; color: white; }")
+        trigger_area = QScrollArea()
+        trigger_area.setWidgetResizable(True)
+        trigger_area.setMinimumHeight(145)
+        trigger_area.setMaximumHeight(190)
+        trigger_area.setWidget(trigger_board)
+
+        self.macro_trigger_group = QGroupBox("Trigger keys and playback")
+        self.macro_trigger_group.setToolTip(
+            "Configure the trigger layer, playback mode, repeat count, and key or keys assigned to this macro."
+        )
+        self.macro_trigger_group.setCheckable(True)
+        self.macro_trigger_group.setChecked(False)
+        trigger_body = QWidget()
+        trigger_col = QVBoxLayout(trigger_body)
+        trigger_col.setContentsMargins(0, 0, 0, 0)
+        trigger_row = QHBoxLayout()
+        trigger_form = QFormLayout()
+        trigger_form.addRow("Playback", self.macro_trigger_mode)
+        trigger_form.addRow("Repeat", self.macro_trigger_count)
+        trigger_row.addLayout(trigger_form)
+        layer_form = QFormLayout()
+        layer_form.addRow("Layer", self.macro_trigger_layer)
+        trigger_row.addLayout(layer_form)
+        trigger_row.addStretch(1)
+        trigger_col.addLayout(trigger_row)
+        trigger_hint = QLabel(
+            "Choose a layer, then click keys to assign the trigger. Multiple selected keys are currently "
+            "written as separate triggers for the same macro."
+        )
+        trigger_hint.setToolTip(
+            "The keyboard protocol stores one macro trigger per key record; this driver does not encode an "
+            "all-keys-at-once chord."
+        )
+        trigger_col.addWidget(trigger_hint)
+        trigger_col.addWidget(trigger_area)
+        trigger_body.setVisible(False)
+        self.macro_trigger_group.toggled.connect(trigger_body.setVisible)
+        trigger_group_layout = QVBoxLayout(self.macro_trigger_group)
+        trigger_group_layout.addWidget(trigger_body)
+
+        editor = QWidget()
+        editor_col = QVBoxLayout(editor)
+        editor_col.setContentsMargins(8, 4, 4, 4)
+        header = QHBoxLayout()
+        header.addWidget(QLabel("Timeline"))
+        header.addWidget(QLabel("Select a block to edit it; overlapping blocks play together."), 1)
+        save = QPushButton("Save to keyboard")
+        save.clicked.connect(self._apply_macros)
+        header.addWidget(save)
+        editor_col.addLayout(header)
+        editor_col.addWidget(self.macro_timeline, 1)
+        editor_col.addWidget(action_editor)
+        editor_col.addWidget(self.macro_trigger_group)
+
+        split = QSplitter()
+        split.addWidget(left)
+        split.addWidget(editor)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 5)
+        split.setSizes([170, 830])
+        return split
+
+    # --------------------------------------------------------------- macro model
+
+    def _empty_trigger(self) -> dict:
+        return {"keys": set(), "fn": set(), "mode": TRIGGER_ROUTINE, "repeat": 1}
+
+    def _current_trigger(self) -> dict:
+        return self.macro_triggers.setdefault(self.current_macro, self._empty_trigger())
+
+    def _fill_macros(self) -> None:
+        events = decode_macros(self.regions["macros"])
+        self.macro_actions = {i: events_to_actions(m) for i, m in enumerate(events)}
+        self.macro_triggers = {i: self._empty_trigger() for i in self.macro_actions}
+        for layer in ("keys", "fn"):
+            data = self.regions[layer]
+            for slot in range(128):
+                record = data[4 * slot : 4 * slot + 4]
+                trigger = decode_trigger(record)
+                if trigger is None:
+                    self.macro_original_bindings[layer][slot] = record
+                elif slot not in self.macro_original_bindings[layer]:
+                    usage = layout.USAGE_BY_SLOT.get(slot) if layer == "keys" else None
+                    self.macro_original_bindings[layer][slot] = encode_key(usage or 0) if usage else EMPTY_KEY
+                if trigger and trigger["slot"] in self.macro_triggers:
+                    self.macro_triggers[trigger["slot"]][layer].add(slot)
+                    self.macro_triggers[trigger["slot"]]["mode"] = trigger["mode"]
+                    self.macro_triggers[trigger["slot"]]["repeat"] = max(1, trigger["repeat"])
+        self.macro_list.blockSignals(True)
+        self.macro_list.clear()
+        for i in self.macro_actions:
+            self.macro_list.addItem(f"M{i + 1}")
+        self.macro_list.blockSignals(False)
+        if self.macro_list.count():
+            self.macro_list.setCurrentRow(0)
+
+    def _select_macro(self, row: int) -> None:
+        if row < 0:
+            return
+        self.current_macro = row
+        actions = self.macro_actions.get(row, [])
+        self._selected_macro_action = 0 if actions else None
+        self._refresh_macro_view()
+
+    def _refresh_macro_view(self) -> None:
+        actions = self.macro_actions.get(self.current_macro, [])
+        if self._selected_macro_action is not None and not (0 <= self._selected_macro_action < len(actions)):
+            self._selected_macro_action = None
+        self.macro_timeline.set_actions(actions, self._selected_macro_action)
+        selected = self._selected_macro_action
+        if selected is not None:
+            action = actions[selected]
+            self.macro_key_combo.setCurrentIndex(max(0, self.macro_key_combo.findData(action.usage)))
+            self.macro_type_combo.setCurrentIndex(0 if action.duration_ms else 1)
+            self.macro_start.setValue(action.start_ms)
+            self.macro_duration.setValue(action.duration_ms)
+        self.macro_update_action_button.setEnabled(selected is not None)
+        self.macro_delete_action_button.setEnabled(selected is not None)
+        self.macro_add_action_button.setEnabled(self.current_macro is not None)
+        trigger = self.macro_triggers.get(self.current_macro, self._empty_trigger())
+        self.macro_trigger_mode.setCurrentIndex(max(0, self.macro_trigger_mode.findData(trigger["mode"])))
+        self.macro_trigger_count.setValue(max(1, trigger["repeat"]))
+        self.macro_trigger_count.setEnabled(trigger["mode"] == TRIGGER_REPEAT)
+        self._paint_trigger_board()
+
+    def _paint_trigger_board(self) -> None:
+        trigger = self.macro_triggers.get(self.current_macro, self._empty_trigger())
+        selected = trigger.get(self.macro_trigger_layer.currentData(), set())
+        for slot, button in self.macro_trigger_buttons.items():
+            button.setChecked(slot in selected)
+
+    def _toggle_trigger_key(self, button: QPushButton) -> None:
+        if self.current_macro is None:
+            return
+        slot = self._slot_of(button)
+        layer = self.macro_trigger_layer.currentData()
+        if slot in self._current_trigger()[layer]:
+            self._current_trigger()[layer].discard(slot)
+        else:
+            self._current_trigger()[layer].add(slot)
+        self._paint_trigger_board()
+
+    def _trigger_mode_changed(self) -> None:
+        if self.current_macro is None:
+            return
+        self._current_trigger()["mode"] = self.macro_trigger_mode.currentData()
+        self.macro_trigger_count.setEnabled(self.macro_trigger_mode.currentData() == TRIGGER_REPEAT)
+
+    def _current_actions(self) -> list[MacroAction]:
+        return self.macro_actions.setdefault(self.current_macro, [])
+
+    def _add_macro(self) -> None:
+        index = len(self.macro_actions)
+        self.macro_actions[index] = [MacroAction(4, 0, 0)]  # tap "A" at 0 ms
+        self.macro_triggers[index] = self._empty_trigger()
+        self.macro_list.addItem(f"M{index + 1}")
+        self.macro_list.setCurrentRow(index)
+
+    def _remove_macro(self) -> None:
+        row = self.macro_list.currentRow()
+        if row < 0:
+            return
+        self.macro_list.blockSignals(True)
+        self.macro_list.takeItem(row)
+        self.macro_actions = {i - 1 if i > row else i: a for i, a in self.macro_actions.items() if i != row}
+        self.macro_triggers = {i - 1 if i > row else i: t for i, t in self.macro_triggers.items() if i != row}
+        for i in range(self.macro_list.count()):
+            self.macro_list.item(i).setText(f"M{i + 1}")
+        if self.macro_list.count():
+            next_row = min(row, self.macro_list.count() - 1)
+            self.macro_list.setCurrentRow(next_row)
+            self.macro_list.blockSignals(False)
+            self._select_macro(next_row)
+        else:
+            self.macro_list.blockSignals(False)
+            self.current_macro = None
+            self._selected_macro_action = None
+            self._refresh_macro_view()
+
+    def _add_action(self) -> None:
+        if self.current_macro is None:
+            return
+        action = MacroAction(
+            self.macro_key_combo.currentData(),
+            self.macro_start.value(),
+            self.macro_duration.value() if self.macro_type_combo.currentData() == "hold" else 0,
+        )
+        self._current_actions().append(action)
+        self._selected_macro_action = len(self._current_actions()) - 1
+        self._refresh_macro_view()
+
+    def _update_action(self) -> None:
+        row = self._selected_macro_action
+        if self.current_macro is None or row is None or not (0 <= row < len(self._current_actions())):
+            return
+        self._current_actions()[row] = MacroAction(
+            self.macro_key_combo.currentData(),
+            self.macro_start.value(),
+            self.macro_duration.value() if self.macro_type_combo.currentData() == "hold" else 0,
+        )
+        self._refresh_macro_view()
+
+    def _delete_action(self) -> None:
+        row = self._selected_macro_action
+        if self.current_macro is None or row is None or not (0 <= row < len(self._current_actions())):
+            return
+        del self._current_actions()[row]
+        self._selected_macro_action = min(row, len(self._current_actions()) - 1) if self._current_actions() else None
+        self._refresh_macro_view()
+
+    def _select_action(self, row: int) -> None:
+        actions = self.macro_actions.get(self.current_macro, [])
+        if not (0 <= row < len(actions)):
+            self._selected_macro_action = None
+            self.macro_timeline.set_actions(actions, None)
+            self.macro_update_action_button.setEnabled(False)
+            self.macro_delete_action_button.setEnabled(False)
+            return
+        self._selected_macro_action = row
+        self.macro_timeline.set_actions(actions, row)
+        action = actions[row]
+        self.macro_key_combo.setCurrentIndex(max(0, self.macro_key_combo.findData(action.usage)))
+        self.macro_type_combo.setCurrentIndex(0 if action.duration_ms else 1)
+        self.macro_start.setValue(action.start_ms)
+        self.macro_duration.setValue(action.duration_ms)
+        self.macro_update_action_button.setEnabled(True)
+        self.macro_delete_action_button.setEnabled(True)
+
+    def _apply_macros(self) -> None:
+        if self.current_macro is not None:
+            self._current_trigger()["mode"] = self.macro_trigger_mode.currentData()
+            self._current_trigger()["repeat"] = self.macro_trigger_count.value()
+        macros = []
+        for i in sorted(self.macro_actions):
+            actions = self.macro_actions[i]
+            if not actions:
+                QMessageBox.warning(self, "Macro", f"Macro M{i + 1} has no actions.")
+                return
+            macros.append(compile_timeline(actions))
+        try:
+            region = encode_macros(macros)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Macro", str(exc))
+            return
+        keys = bytearray(self.regions.get("keys", bytes(512)))
+        fn = bytearray(self.regions.get("fn", bytes(512)))
+        for slot in range(128):  # this feature owns every macro binding
+            if keys[4 * slot] == 6:
+                keys[4 * slot : 4 * slot + 4] = self.macro_original_bindings["keys"].get(
+                    slot, encode_key(layout.USAGE_BY_SLOT[slot]) if slot in layout.USAGE_BY_SLOT else EMPTY_KEY
+                )
+            if fn[4 * slot] == 6:
+                fn[4 * slot : 4 * slot + 4] = self.macro_original_bindings["fn"].get(slot, EMPTY_KEY)
+        for i in sorted(self.macro_actions):
+            trigger = self.macro_triggers.get(i, self._empty_trigger())
+            repeat = trigger["repeat"] if trigger["mode"] == TRIGGER_REPEAT else 0
+            record = encode_trigger(i, trigger["mode"], repeat)
+            for slot in trigger.get("keys", ()):
+                if 0 <= slot < 128:
+                    keys[4 * slot : 4 * slot + 4] = record
+                    self.macro_original_bindings["keys"].setdefault(
+                        slot, encode_key(layout.USAGE_BY_SLOT[slot]) if slot in layout.USAGE_BY_SLOT else EMPTY_KEY
+                    )
+            for slot in trigger.get("fn", ()):
+                if 0 <= slot < 128:
+                    fn[4 * slot : 4 * slot + 4] = record
+                    self.macro_original_bindings["fn"].setdefault(slot, EMPTY_KEY)
+
+        def job() -> str:
+            with Keyboard.open(self.vid, self.pid) as kb:
+                kb.write_region("macros", region)
+                kb.write_region("keys", bytes(keys))
+                kb.write_region("fn", bytes(fn))
+                kb.commit()
+            return f"{len(macros)} macro(s) saved"
+
+        self.jobs.submit("macro", job)
+
     def _paint_calibration(self) -> None:
         for slot, button in self.cal_buttons.items():
-            colour = self.cal_colors.get(slot, COLOR_GREEN)
+            colour = self.cal_colors.get(slot, COLOR_UNCALIBRATED)
             button.setStyleSheet(f"background-color: {colour}; color: white;")
             button.setToolTip(
                 f"{layout.LAYOUT[slot]}: "
-                + ("not calibrated" if colour == COLOR_RED else "improved" if colour == COLOR_BLUE else "calibrated")
+                + ("not changed" if colour == COLOR_UNCALIBRATED else "improved" if colour == COLOR_BLUE else "calibrated")
             )
 
     @staticmethod
@@ -405,7 +900,7 @@ class Window(QWidget):
         return board, buttons
 
     def _slot_of(self, button: QPushButton) -> int:
-        for name in ("key_buttons", "socd_buttons", "cal_buttons"):
+        for name in ("key_buttons", "socd_buttons", "cal_buttons", "macro_trigger_buttons"):
             for slot, candidate in getattr(self, name, {}).items():
                 if candidate is button:
                     return slot
@@ -453,6 +948,7 @@ class Window(QWidget):
         self._fill_settings()
         self._fill_socd()
         self._load_rt_form()
+        self._fill_macros()
         self.status.setText("ready")
 
     def _fill_settings(self) -> None:
@@ -495,26 +991,24 @@ class Window(QWidget):
 
     def _fill_calibration(self, seen: dict) -> None:
         for slot, values in seen.items():
-            if not values["status"]:
+            if not values["status"] or values["travel"] <= 0 or values["travel_max"] <= 0:
                 continue
-            previous = self._cal_seen.get(slot)
-            if previous is None:
-                self.cal_colors[slot] = COLOR_GREEN  # first time this key measured
-            elif values["travel"] > previous["travel"]:
-                self.cal_colors[slot] = COLOR_BLUE  # pressed deeper than before
-            elif slot in self.cal_colors and self.cal_colors[slot] != COLOR_BLUE:
-                self.cal_colors[slot] = COLOR_GREEN  # measured again without going deeper
+            self.cal_colors[slot] = COLOR_GREEN
             self._cal_seen[slot] = values
         self._paint_calibration()
 
-        self.calibration_table.setRowCount(len(seen))
-        for row, slot in enumerate(sorted(seen)):
-            values = seen[slot]
+        successful = {
+            slot: values for slot, values in seen.items()
+            if values["status"] and values["travel"] > 0 and values["travel_max"] > 0
+        }
+        self.calibration_table.setRowCount(len(successful))
+        for row, slot in enumerate(sorted(successful)):
+            values = successful[slot]
             cells = [
                 f"{layout.LAYOUT.get(slot, slot)}  (slot {slot})",
                 "ok" if values["status"] else "not calibrated",
-                f"{values['travel'] / 10:.1f} mm",
-                f"{values['travel_max'] / 10:.1f} mm",
+                f"{values['travel'] / 100:.2f} mm",
+                f"{values['travel_max'] / 100:.2f} mm",
             ]
             for column, text in enumerate(cells):
                 self.calibration_table.setItem(row, column, QTableWidgetItem(text))
@@ -526,7 +1020,7 @@ class Window(QWidget):
 
         def job() -> dict:
             with Keyboard.open(self.vid, self.pid) as kb:
-                return {name: kb.read_region(name) for name in ("settings", "keys", "rt")}
+                return {name: kb.read_region(name) for name in ("settings", "keys", "rt", "macros", "fn")}
 
         self.jobs.submit("load", job)
 
@@ -652,16 +1146,40 @@ class Window(QWidget):
 
     def _calibrate(self) -> None:
         self.calibration_button.setEnabled(False)
-        self.status.setText("measuring…")
-        self.cal_colors = {slot: COLOR_RED for slot in self.cal_buttons}  # every key starts unmeasured
+        self.calibration_save_button.setEnabled(True)
+        self.calibration_cancel_button.setEnabled(True)
+        self._calibration_active = True
+        self._calibration_decision = None
+        self._calibration_stop.clear()
+        self._calibration_color_snapshot = dict(self.cal_colors)
+        self._calibration_seen_snapshot = {slot: dict(values) for slot, values in self._cal_seen.items()}
+        self.status.setText("calibration active — press the keys to recalibrate")
         self._cal_seen = {}
         self._paint_calibration()
 
         def job() -> dict:
             with Keyboard.open(self.vid, self.pid) as kb:
-                return kb.measure_travel(CALIBRATION_SECONDS, self.jobs.progress.emit)
+                seen, decision = kb.calibration_session(
+                    lambda: self._calibration_decision if self._calibration_stop.is_set() else None,
+                    self.jobs.progress.emit,
+                )
+                if decision == "save" and any(
+                    row["status"] and row["travel"] > 0 and row["travel_max"] > 0
+                    for row in seen.values()
+                ):
+                    kb.save_calibration()
+                return {"seen": seen, "decision": decision}
 
         self.jobs.submit("calibrate", job)
+
+    def _finish_calibration(self, decision: str) -> None:
+        if not self._calibration_active:
+            return
+        self._calibration_decision = decision
+        self._calibration_stop.set()
+        self.calibration_save_button.setEnabled(False)
+        self.calibration_cancel_button.setEnabled(False)
+        self.status.setText("saving calibration…" if decision == "save" else "cancelling calibration…")
 
     # --------------------------------------------------------------- callbacks
 
@@ -670,15 +1188,46 @@ class Window(QWidget):
             self.regions = result
             self._fill_all()
         elif name == "calibrate":
-            self._fill_calibration(result)
+            decision = result["decision"]
+            if decision == "cancel":
+                self.cal_colors = self._calibration_color_snapshot
+                self._cal_seen = self._calibration_seen_snapshot
+                self._paint_calibration()
+                self.calibration_table.setRowCount(0)
+                if self._cal_seen:
+                    self._fill_calibration(self._cal_seen)
+            else:
+                self._fill_calibration(result["seen"])
+            self._calibration_active = False
             self.calibration_button.setEnabled(True)
-            self.status.setText(f"measured {len(result)} key(s)")
+            self.calibration_save_button.setEnabled(False)
+            self.calibration_cancel_button.setEnabled(False)
+            if decision == "save":
+                successful = sum(
+                    bool(row["status"] and row["travel"] > 0 and row["travel_max"] > 0)
+                    for row in result["seen"].values()
+                )
+                self.status.setText(
+                    f"saved calibration for {successful} key(s)" if successful else "no keys changed; saved calibration preserved"
+                )
+            else:
+                self.status.setText("calibration cancelled; saved calibration preserved")
         else:
             self.status.setText(str(result))
-            if name in ("write", "socd", "restore"):
+            if name in ("write", "socd", "restore", "macro"):
                 self.refresh()
 
     def _on_failed(self, name: str, message: str) -> None:
+        if name == "calibrate":
+            self._calibration_active = False
+            self.cal_colors = self._calibration_color_snapshot
+            self._cal_seen = self._calibration_seen_snapshot
+            self._paint_calibration()
+            self.calibration_table.setRowCount(0)
+            if self._cal_seen:
+                self._fill_calibration(self._cal_seen)
+            self.calibration_save_button.setEnabled(False)
+            self.calibration_cancel_button.setEnabled(False)
         self.calibration_button.setEnabled(True)
         self.status.setText(f"{name} failed")
         QMessageBox.warning(self, "Fighting 68", message)

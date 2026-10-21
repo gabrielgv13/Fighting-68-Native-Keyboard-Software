@@ -119,6 +119,14 @@ class RegionRoundTripTest(unittest.TestCase):
             for name, hexdata in saved.items():
                 self.assertEqual(bytes.fromhex(hexdata), kb.read_region(name))
 
+    def test_macro_region_round_trips_through_the_driver(self):
+        from fighting68.macro import MacroEvent, decode_macros, encode_macros
+
+        macros = [[MacroEvent(0, 4, True), MacroEvent(10, 4, False)]]
+        with open_fake() as kb:
+            kb.write_region("macros", encode_macros(macros))
+            self.assertEqual(decode_macros(kb.read_region("macros")), macros)
+
 
 class FailurePathTest(unittest.TestCase):
     def test_timeout_raises_the_protocol_error_the_cli_shows(self):

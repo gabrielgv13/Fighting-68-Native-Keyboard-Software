@@ -8,6 +8,7 @@ import json
 import sys
 
 from . import layout
+from .macro import decode_macros, events_to_actions, macro_keys
 from .protocol import (
     CALIBRATION_REPORT,
     REGIONS,
@@ -247,6 +248,28 @@ def cmd_gui(args: argparse.Namespace) -> None:
     run(args.vid, args.pid)
 
 
+def cmd_macro(args: argparse.Namespace) -> None:
+    with open_keyboard(args) as kb:
+        data = kb.read_region("macros")
+        if args.clear:
+            kb.write_region("macros", bytes(len(data)))
+            kb.commit()
+            print("macros cleared")
+            return
+    names = macro_keys()
+    for index, events in enumerate(decode_macros(data)):
+        print(f"M{index + 1}")
+        for action in events_to_actions(events):
+            kind = "hold" if action.duration_ms else "tap"
+            label = names.get(action.usage, f"0x{action.usage:02x}")
+            print(
+                f"  {label:<12} {kind:<4} start={action.start_ms:>5}ms "
+                f"hold={action.duration_ms:>5}ms"
+            )
+    if not decode_macros(data):
+        print("no macros")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="fighting68", description=__doc__)
     p.add_argument("--vid", type=lambda t: int(t, 0), default=0x0C45, help="USB vendor id")
@@ -291,6 +314,10 @@ def build_parser() -> argparse.ArgumentParser:
     cal = sub.add_parser("calibrate", help="measure each pressed key's travel without changing the board")
     cal.add_argument("--seconds", type=float, help="stop after this many seconds")
     cal.set_defaults(func=cmd_calibrate)
+
+    macro = sub.add_parser("macro", help="list the board's macros (or clear them)")
+    macro.add_argument("--clear", action="store_true", help="erase every macro")
+    macro.set_defaults(func=cmd_macro)
     return p
 
 

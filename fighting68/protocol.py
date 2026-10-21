@@ -202,7 +202,12 @@ CALIBRATION_REPORT = 0xFB
 
 def decode_calibration(rec: bytes) -> dict:
     """While calibrating the board reports the key slot and its state; otherwise the
-    live travel of the pressed key (driver: `window.getCalibration`)."""
+    live travel of the pressed key (driver: `window.getCalibration`). Travel fields
+    are hundredths of a millimeter, matching the web driver's travel ratio math."""
+    if len(rec) < 14 or rec[0] != REPLY_MAGIC or rec[1] != CALIBRATION_REPORT:
+        raise ProtocolError("invalid calibration report")
+    if rec[2] >= 128:
+        raise ProtocolError(f"invalid calibration key slot {rec[2]}")
     return {
         "key": rec[2],
         "status": rec[3],
@@ -299,8 +304,11 @@ class Keyboard:
         self.calibrate(False)
 
     def discard_calibration(self) -> None:
-        """Leave calibration mode without committing: the web driver's "Clear
-        Calibration" button sends cmd 0x0F arg 5, which also exits a session."""
+        """Send the web driver's Clear Calibration command (0x0F/5).
+
+        This clears calibration and must not be used for a Cancel action that
+        is meant to preserve the saved values.
+        """
         self.command(0x0F, 5, 0, 0, 0)
 
     def read_report(self, timeout_ms: int = TIMEOUT_MS) -> bytes | None:
@@ -308,25 +316,31 @@ class Keyboard:
         return bytes(self.dev.read(REPORT_LEN, timeout_ms)) or None
 
     def measure_travel(self, seconds: float, on_progress=None) -> dict[int, dict]:
-        """Measure each pressed key's deepest travel WITHOUT entering the board's
+        """Read each pressed key's travel WITHOUT entering the board's
         calibration mode. In normal mode the firmware still streams 0xFB reports
         for pressed keys carrying the slot, the live travel and the switch's full
         travel, so nothing is written to the board. Returns per key {status,
-        travel, travel_max} for keys that were actually pressed (travel > 0)."""
+        travel, travel_max}. The latest valid raw sample is retained; values are
+        not smoothed or capped."""
         seen: dict[int, dict] = {}
         deadline = time.monotonic() + seconds
         last = 0.0
         try:
             while time.monotonic() < deadline:
                 report = self.read_report(500)
-                if not report or report[1] != CALIBRATION_REPORT:
+                if not report or len(report) < 2 or report[1] != CALIBRATION_REPORT:
                     continue
-                live = decode_calibration(report)
+                try:
+                    live = decode_calibration(report)
+                except ProtocolError:
+                    continue
                 if live["travel"] <= 0:
                     continue  # resting key: not actually pressed
-                row = seen.setdefault(live["key"], {"status": 1, "travel": 0, "travel_max": live["travel_max"]})
-                row["travel"] = max(row["travel"], live["travel"])
-                row["travel_max"] = max(row["travel_max"], live["travel_max"])
+                if live["travel_max"] > 0 and live["travel"] > live["travel_max"]:
+                    continue  # impossible sample; preserve the last valid reading
+                row = seen.setdefault(live["key"], {"status": 1, "travel": 0, "travel_max": 0})
+                row["travel"] = live["travel"]
+                row["travel_max"] = live["travel_max"]
                 if on_progress and time.monotonic() - last > 0.2:
                     last = time.monotonic()
                     on_progress(dict(seen))
@@ -334,11 +348,44 @@ class Keyboard:
             pass
         return seen
 
+    def calibration_session(self, should_stop, on_progress=None) -> tuple[dict[int, dict], str]:
+        """Stream until ``should_stop()`` returns ``save`` or ``cancel``.
+
+        Cancel deliberately sends no command: the only observed web command for
+        clearing calibration is 0x0F/5, which can erase saved values. The caller
+        releases the HID connection after cancel.
+        """
+        seen: dict[int, dict] = {}
+        last = 0.0
+        self.calibrate(True)
+        while True:
+            action = should_stop()
+            if action:
+                return seen, action
+            report = self.read_report(100)
+            if not report or len(report) < 2 or report[1] != CALIBRATION_REPORT:
+                continue
+            try:
+                live = decode_calibration(report)
+            except ProtocolError:
+                continue
+            if not live["status"] or live["travel"] <= 0 or live["travel_max"] <= 0:
+                continue  # don't expose untouched keys as zero-travel calibrations
+            if live["travel"] > live["travel_max"]:
+                continue  # impossible sample; preserve the last valid reading
+            row = seen.setdefault(live["key"], {"status": 1, "travel": 0, "travel_max": 0})
+            row["travel"] = live["travel"]
+            row["travel_max"] = live["travel_max"]
+            if on_progress and time.monotonic() - last > 0.2:
+                last = time.monotonic()
+                on_progress(dict(seen))
+
     def collect_calibration(self, seconds: float, on_progress=None) -> tuple[dict[int, dict], bool]:
-        """Enter calibration mode and stream reports for `seconds`, returning
-        (per-key measurements, interrupted). A key was pressed and calibrated
-        iff its `status` is non-zero. Does not leave calibration mode: the
-        caller commits with `save_calibration()` or `discard_calibration()`."""
+        """Collect reports for a fixed interval, leaving the session open.
+
+        The caller can then save. An interrupted session sends no clear command;
+        close the HID connection to release the device without erasing saved data.
+        """
         seen: dict[int, dict] = {}
         deadline = time.monotonic() + seconds
         last = 0.0
@@ -346,14 +393,20 @@ class Keyboard:
         self.calibrate(True)
         try:
             while time.monotonic() < deadline:
-                report = self.read_report(500)
-                if not report or report[1] != CALIBRATION_REPORT:
+                report = self.read_report(100)
+                if not report or len(report) < 2 or report[1] != CALIBRATION_REPORT:
                     continue
-                live = decode_calibration(report)
-                row = seen.setdefault(live["key"], {"status": 0, "travel": 0, "travel_max": 0})
-                row["status"] = live["status"]
+                try:
+                    live = decode_calibration(report)
+                except ProtocolError:
+                    continue
+                if not live["status"] or live["travel"] <= 0 or live["travel_max"] <= 0:
+                    continue
+                if live["travel"] > live["travel_max"]:
+                    continue
+                row = seen.setdefault(live["key"], {"status": 1, "travel": 0, "travel_max": 0})
+                row["travel"] = live["travel"]
                 row["travel_max"] = live["travel_max"]
-                row["travel"] = max(row["travel"], live["travel"])
                 if on_progress and time.monotonic() - last > 0.2:
                     last = time.monotonic()
                     on_progress(dict(seen))
@@ -362,12 +415,12 @@ class Keyboard:
         return seen, interrupted
 
     def calibrate_for(self, seconds: float, on_progress=None) -> dict[int, dict]:
-        """Stream calibration for `seconds` and save. A Ctrl-C instead discards
-        the session, so unpressed keys are never committed, and keeps what it saw."""
+        """Compatibility helper for a timed capture; commits only successful keys."""
         seen, interrupted = self.collect_calibration(seconds, on_progress)
-        if interrupted:
-            self.discard_calibration()
-        else:
+        if not interrupted and any(
+            row["status"] and row["travel"] > 0 and row["travel_max"] > 0
+            for row in seen.values()
+        ):
             self.save_calibration()
         return seen
 

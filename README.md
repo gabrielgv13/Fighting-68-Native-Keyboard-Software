@@ -19,6 +19,7 @@ verified against a real Fighting 68 plugged into the machine.
 > uv run python -m fighting68 rt            # per-key sensitivity overrides
 > uv run python -m fighting68 socd          # SOCD rules
 > uv run python -m fighting68 calibrate     # press every key, get the measured travel
+> uv run python -m fighting68 macro         # list the board's macros
 ```
 
 Take a backup before changing anything — `dump` / `restore` round-trip every
@@ -35,16 +36,15 @@ region byte for byte:
 > uv run python -m fighting68 gui
 ```
 
-The same four areas as the CLI, in one window. **Sensitivity** draws the board
+The same areas as the CLI, in one window. **Sensitivity** draws the board
 itself — the 65 keys at their real widths — and clicking one fills the form with
 its actuation point, press/release sensitivity, switch type and rapid-trigger
 flags. **SOCD** adds and removes rules — its own board feeds the pickers, click a
 key for Key 1 and the next for Key 2 — **Behaviour** is the board-wide block
-(hover a label for what it does) and **Calibration** runs for 20 s and fills a
-per-key table with each pressed key's measured travel, with the board coloured
-red (not measured), green (measured) or light blue (pressed deeper). It only
-reads the board — it never enters the firmware's destructive calibration mode.
-Keys on the
+(hover a label for what it does), **Calibration** starts a live per-key session.
+Only keys that report successful calibration turn green; Save commits the
+reported keys, while Cancel leaves saved calibration untouched. **Macro** edits
+macros on a timeline. Keys on the
 Sensitivity tab click-toggle into a selection — **Select all** grabs the whole
 board — and **Apply to selection** writes the form's record to every one of
 them.
@@ -115,18 +115,23 @@ both keys, and so does this tool.
 
 ### Calibration
 
-`calibrate` measures each key's travel **without touching the board's stored
-calibration**. Press each key fully while it runs; the firmware already streams
-`0xFB` reports in normal mode carrying the key slot, the live travel and the
-switch's full travel, and the tool just records the deepest movement it sees.
-`travel` is the deepest movement measured, `of` is the full travel of the switch.
-Only keys you actually press appear in the results.
+The GUI uses the firmware calibration flow: cmd `0x64` starts a session, `0xFB`
+reports identify each key slot and its calibration status, and cmd `0x65` saves
+successful reports. Keys without a successful report are not included in the
+save path, and an empty session sends no save command. Cancel closes the HID
+session without sending the web app's `0x0F/5` **Clear Calibration** command,
+which can erase saved values. The CLI `calibrate` command remains a read-only
+travel measurement; it does not enter calibration mode.
 
-The firmware's own calibration mode (cmd `0x64` enter / `0x65` save / `0x0F`
-clear) is deliberately not used here: on this board it re-measures every key
-the moment it is entered, so an accidental click overwrites keys you never
-pressed. Use the vendor's web configurator when you really want to rewrite the
-board's calibration data.
+### Macros
+
+`macro` lists the board's macros; `macro --clear` erases them. The GUI **Macro**
+tab edits them on a video-editor style timeline: each key action is a block on
+its own row, positioned by its start time and sized by how long it is held.
+Blocks that overlap play together, so holding several keys at once is just
+overlapping blocks. Every macro is capped at **10 keys**; set a **repeat** count
+to loop the whole performance, pick a **trigger key** to run the macro from, and
+**Apply** to write the macro store.
 
 ## The wire protocol
 

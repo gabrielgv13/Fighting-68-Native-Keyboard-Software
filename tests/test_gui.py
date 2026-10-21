@@ -35,6 +35,8 @@ class GuiTest(unittest.TestCase):
                 encode_rt(trigger=1.2, down=0.5, up=0.08, flags=RT_WHOLE | RT_BOTTOM) if slot == SLOT_A else bytes(8)
                 for slot in range(128)
             ),
+            "macros": bytes(4008),
+            "fn": bytes(512),
         }
         self.window._fill_all()
         # Start each test with exactly A selected: drop the Esc key the build preselects.
@@ -169,6 +171,35 @@ class GuiTest(unittest.TestCase):
         self.window._fill_calibration({SLOT_D: {"status": 1, "travel": 34, "travel_max": 34}})
         self.assertEqual(self.window.cal_colors[SLOT_D], gui.COLOR_GREEN)
         self.assertEqual(self.window.cal_colors[SLOT_A], gui.COLOR_RED)
+
+    # -------------------------------------------------------------------- macro
+
+    def test_macro_tab_decodes_a_macro_from_the_region(self):
+        from fighting68.macro import MacroEvent, encode_macros
+
+        self.window.regions["macros"] = encode_macros([[MacroEvent(0, 4, True), MacroEvent(10, 4, False)]])
+        self.window._fill_macros()
+        self.assertEqual(self.window.macro_list.count(), 1)
+        self.assertEqual(len(self.window.macro_actions[0]), 1)  # one A tap
+
+    def test_macro_editor_add_and_apply_without_a_board(self):
+        self.window._add_macro()
+        self.assertEqual(self.window.macro_list.count(), 1)
+        self.window._add_action()  # adds a second action to M1
+        self.assertEqual(len(self.window.macro_actions[0]), 2)
+        self.window._apply_macros()  # DeviceJobs.submit is stubbed out in tests
+
+    def test_trigger_keys_are_selected_via_the_keyboard_layout(self):
+        self.window._add_macro()  # M1 selected
+        self.window.macro_trigger_layer.setCurrentIndex(0)  # normal layer
+        self.window.macro_trigger_buttons[SLOT_A].click()
+        self.window.macro_trigger_buttons[SLOT_W].click()
+        self.assertEqual(self.window.macro_triggers[0]["keys"], {SLOT_A, SLOT_W})
+        # Fn layer is tracked separately
+        self.window.macro_trigger_layer.setCurrentIndex(1)  # Fn + key
+        self.window.macro_trigger_buttons[SLOT_D].click()
+        self.assertEqual(self.window.macro_triggers[0]["fn"], {SLOT_D})
+        self.assertEqual(self.window.macro_triggers[0]["keys"], {SLOT_A, SLOT_W})
 
 
 if __name__ == "__main__":
